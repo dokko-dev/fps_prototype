@@ -4,12 +4,12 @@ import {WebSocketServer,WebSocket} from 'ws';
 import {randomBytes} from 'node:crypto';
 import * as THREE from 'three';
 import {WEAPONS,BOXES,speed,blocked} from './public/shared.js';
-const app=express();app.use(express.static('public'));app.use('/vendor',express.static('node_modules/three/build'));
+const app=express();app.get('/health',(_req,res)=>res.json({status:'ok'}));app.use(express.static('public'));app.use('/vendor',express.static('node_modules/three/build'));
 const server=createServer(app),wss=new WebSocketServer({server}),rooms=new Map();
 const send=(ws,data)=>{if(ws.readyState===WebSocket.OPEN)ws.send(JSON.stringify(data));};
 const broadcast=(room,data)=>room.players.forEach(p=>send(p.ws,data));
 function reset(p,index){Object.assign(p,{x:index?10:-10,z:index? -11:11,y:0,vy:0,yaw:index?Math.PI:0,pitch:0,hp:100,ammo:WEAPONS[p.weapon].mag,reload:0,input:{},lastShot:0});}
-const walls=BOXES.map(([x,y,z,w,h,d])=>new THREE.Box3(new THREE.Vector3(x-w/2,y-h/2,z-d/2),new THREE.Vector3(x+w/2,y+h/2,z+d/2)));
+const walls=[...BOXES,[0,-.25,10.75,29,.5,7.5],[0,-.25,-10.75,29,.5,7.5],[0,-.25,0,8.3,.5,14]].map(([x,y,z,w,h,d])=>new THREE.Box3(new THREE.Vector3(x-w/2,y-h/2,z-d/2),new THREE.Vector3(x+w/2,y+h/2,z+d/2)));
 wss.on('connection',ws=>{
  let player,room;let count=0,windowStart=Date.now();
  ws.on('message',raw=>{try{
@@ -35,8 +35,10 @@ wss.on('connection',ws=>{
  ws.on('close',()=>{if(room&&player){room.players=room.players.filter(p=>p!==player);if(!room.players.length)rooms.delete(room.code);}});
 });
 function shoot(p,room){
- const now=Date.now(),w=WEAPONS[p.weapon];if(p.hp<=0||p.reload||p.ammo<=0||now-p.lastShot<w.interval||room.players.length<2)return;
- p.ammo--;p.lastShot=now;let hit=false,head=false;
+ const now=Date.now(),w=WEAPONS[p.weapon];
+ if(p.hp<=0||p.reload||p.ammo<=0){send(p.ws,{type:'shootBlocked',reason:p.hp<=0?'부활을 기다려 주세요.':p.reload?'재장전 / 무기 준비 중입니다.':'탄약이 없습니다. R로 재장전하세요.'});return;}
+ if(now-p.lastShot<w.interval)return;
+ p.ammo--;p.lastShot=now;let hit=false,head=false;const paths=[];
  for(let n=0;n<(w.pellets||1);n++){
  const yaw=p.yaw+(Math.random()-.5)*(w.spread||0),pitch=p.pitch+(Math.random()-.5)*(w.spread||0);
  const origin=new THREE.Vector3(p.x,p.y+1.65,p.z),direction=new THREE.Vector3(-Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),-Math.cos(yaw)*Math.cos(pitch));
@@ -45,9 +47,11 @@ function shoot(p,room){
  for(const other of room.players){if(other===p||other.hp<=0)continue;
  const body=new THREE.Box3(new THREE.Vector3(other.x-.32,other.y,other.z-.32),new THREE.Vector3(other.x+.32,other.y+1.9,other.z+.32));
  const point=ray.intersectBox(body,new THREE.Vector3());if(point&&point.distanceTo(origin)<nearest){nearest=point.distanceTo(origin);victim=other;critical=point.y>other.y+1.4;}}
+ paths.push(origin.clone().addScaledVector(direction,nearest).toArray());
  if(victim){hit=true;head ||= critical;victim.hp=Math.max(0,victim.hp-(w.damage/(w.pellets||1))*(critical?2:1));if(!victim.hp){p.kills++;victim.respawn=now+3000;broadcast(room,{type:'kill',killer:p.id,head:critical});}}
  }
  send(p.ws,{type:'shot',hit,head,recoil:w.recoil});
+ broadcast(room,{type:'tracer',id:p.id,origin:[p.x,p.y+1.65,p.z],ends:paths});
  broadcast(room,{type:'sound',x:p.x,z:p.z,kind:'shot',id:p.id});
 }
 setInterval(()=>{

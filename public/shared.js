@@ -10,9 +10,15 @@ export const WEAPONS = [
  {name:'SR2 · 스카우트',type:'저격소총',damage:19,recoil:2.8,weight:4.2,interval:750,mag:10},
  {name:'SR8 · 볼트',type:'저격소총',damage:20,recoil:4.5,weight:5.4,interval:1100,mag:5}
 ];
+// BRIDGE YARD: two bases linked by a protected bridge over a canal.
 export const BOXES = [
- [-5,1.5,-5,4,3,2],[5,1.5,5,4,3,2],[-6,1.5,4,2,3,5],[6,1.5,-4,2,3,5],
- [0,1.25,0,3,2.5,3],[-10,1,-9,3,2,3],[10,1,9,3,2,3],[-2,1,9,3,2,2],[2,1,-9,3,2,2]
+ [0,1.25,0,3,2.5,3],
+ [-6,1.5,8,2,3,2],[6,1.5,-8,2,3,2],
+ [5,1.3,12.5,3,2.6,1],[-5,1.3,-12.5,3,2.6,1],
+ [-2.8,1,4,1.4,2,2],[2.8,1,-4,1.4,2,2],
+ [-4.4,.6,0,.5,1.2,14],[4.4,.6,0,.5,1.2,14],
+ [0,2,-14.5,30,4,1],[0,2,14.5,30,4,1],
+ [-14.5,2,0,1,4,30],[14.5,2,0,1,4,30]
 ];
 export const speed = (weapon, sprint=false) => (4.6-WEAPONS[weapon].weight*0.28)*(sprint?1.65:1);
-export function blocked(x,z){return Math.abs(x)>13.5||Math.abs(z)>13.5||BOXES.some(([bx,,bz,w,,d])=>Math.abs(x-bx)<w/2+0.35&&Math.abs(z-bz)<d/2+0.35);}
+export function blocked(x,z){return Math.abs(x)>13.5||Math.abs(z)>13.5||(Math.abs(z)<7.35&&Math.abs(x)>3.8)||BOXES.some(([bx,,bz,w,,d])=>Math.abs(x-bx)<w/2+0.35&&Math.abs(z-bz)<d/2+0.35);}
