@@ -30,4 +30,4 @@ export function createGun(index){
  const flash=new THREE.Mesh(new THREE.SphereGeometry(.065,8,6),new THREE.MeshBasicMaterial({color:0xffe3a0}));flash.scale.z=2;flash.position.set(0,.015,tip-.04);flash.visible=false;group.add(flash);
  group.userData.flash=flash;return group;
 }
-export function disposeGroup(group){group.traverse(m=>{if(m.geometry)m.geometry.dispose();if(m.material){for(const material of Array.isArray(m.material)?m.material:[m.material])material.dispose();}});}
+export function disposeGroup(group){for(const texture of group.userData.textures||[])texture.dispose();group.traverse(m=>{if(m.isInstancedMesh)m.dispose();if(m.geometry)m.geometry.dispose();if(m.material){for(const material of Array.isArray(m.material)?m.material:[m.material])material.dispose();}});}

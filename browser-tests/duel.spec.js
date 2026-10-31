@@ -43,7 +43,7 @@ test('three selectable maps, immediate stop under 100 ms latency, rifle dot and 
  await expect(page.locator('#score')).toContainText(map==='hills'?'GREEN RIDGE':'DUST DEPOT');
  await page.locator('#enter').click();await expect.poll(()=>page.evaluate(()=>document.pointerLockElement?.id)).toBe('game');
  const position=async()=>JSON.parse(await page.locator('canvas').getAttribute('data-position'));
- const before=await position();await page.keyboard.down('KeyD');await page.waitForTimeout(300);await page.keyboard.up('KeyD');await page.waitForTimeout(70);const stop=await position();await page.waitForTimeout(350);const after=await position();
+ const before=await position();await page.keyboard.down('KeyD');await expect.poll(async()=>(await position())[0]).toBeGreaterThan(before[0]+.3);await page.keyboard.up('KeyD');await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));const stop=await position();await page.waitForTimeout(350);const after=await position();
  expect(stop[0]).toBeGreaterThan(before[0]+.3);expect(Math.abs(after[0]-stop[0])).toBeLessThan(.12);
  await page.screenshot({path:'test-results/'+map+'.png'});
  if(map==='hills'){
@@ -52,4 +52,26 @@ test('three selectable maps, immediate stop under 100 ms latency, rifle dot and 
  }
  }
  expect(errors).toEqual([]);await page.close();
+});
+
+test('sensitivity settings persist, reset and open during a match',async({page})=>{
+ await page.goto('/');await page.locator('#lobbysettings').click();await expect(page.getByRole('dialog')).toBeVisible();
+ await page.locator('#hipsensitivity').fill('1.75');await page.locator('#adssensitivity').fill('0.55');await expect(page.locator('#hipvalue')).toHaveText('1.75×');await expect(page.locator('#adsvalue')).toHaveText('0.55×');
+ await page.locator('#closesettings').click();await page.reload();await page.locator('#lobbysettings').click();await expect(page.locator('#hipsensitivity')).toHaveValue('1.75');await expect(page.locator('#adssensitivity')).toHaveValue('0.55');
+ await page.locator('#quality').selectOption('low');await page.reload();await page.locator('#lobbysettings').click();await expect(page.locator('#quality')).toHaveValue('low');
+ await page.locator('#resetsensitivity').click();await expect(page.locator('#hipsensitivity')).toHaveValue('1');await expect(page.locator('#adssensitivity')).toHaveValue('1');await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).toBeHidden();
+ await page.locator('#create').click();await expect(page.locator('#hud')).toBeVisible();await page.locator('#pausesettings').click();await expect(page.getByRole('dialog')).toBeVisible();await page.locator('#closesettings').click();await page.locator('#enter').click();await expect.poll(()=>page.evaluate(()=>document.pointerLockElement?.id)).toBe('game');
+});
+
+test('batched rendering keeps draw calls bounded in all maps',async({page})=>{
+ const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error'&&/THREE|shader|WebGL/i.test(m.text()))errors.push(m.text());});
+ for(const map of ['bridge','hills','depot']){
+ await page.goto('/');await page.locator('#map').selectOption(map);await page.locator('#create').click();await expect(page.locator('#hud')).toBeVisible();
+ await expect.poll(async()=>Number(await page.locator('canvas').getAttribute('data-drawcalls'))).toBeGreaterThan(0);
+ await page.waitForTimeout(4500); // Measure after shader warmup and automatic resolution adjustment.
+ const stats=await page.locator('canvas').evaluate((c,map)=>({map,draws:c.dataset.drawcalls,triangles:c.dataset.triangles,resolution:c.dataset.resolution,fps:c.dataset.fps}),map);
+ console.log('Render metrics:',stats);expect(Number(stats.draws)).toBeLessThan(40);
+ await expect(page.locator('#performance')).toContainText('FPS');await page.screenshot({path:'test-results/optimized-'+map+'.png'});
+ }
+ expect(errors).toEqual([]);
 });

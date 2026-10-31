@@ -29,6 +29,7 @@ wss.on('connection',ws=>{
  else{const id=randomBytes(3).toString('hex').toUpperCase();room={code:id,players:[],map:validMap(m.map)};rooms.set(id,room);}
  player={id:randomBytes(6).toString('hex'),ws,weapon:0,kills:0};reset(player,room.players.length,room.map);room.players.push(player);send(ws,{type:'joined',id:player.id,code:room.code,map:room.map});return;
  }
+ if(m.type==='ping'&&Number.isFinite(m.at)){send(ws,{type:'pong',at:m.at});return;}
  if(!player)return;
  if(m.type==='input'){
  const i=m.input||{};player.input={forward:!!i.forward,back:!!i.back,left:!!i.left,right:!!i.right,sprint:!!i.sprint,ads:!!i.ads,jump:!!i.jump};
@@ -78,7 +79,8 @@ setInterval(()=>{
  const i=p.input,moving=i.forward||i.back||i.left||i.right;
  if(i.sprint&&moving&&p.y<=groundHeight(room.map,p.x,p.z)+.08&&now-(p.step||0)>340){p.step=now;broadcast(room,{type:'sound',x:p.x,z:p.z,kind:'step',id:p.id});}
  }
- for(const p of room.players)send(p.ws,{type:'state',players:room.players.map(o=>({id:o.id,x:o.x,y:o.y,z:o.z,yaw:o.yaw,hp:Math.ceil(o.hp),kills:o.kills,weapon:o.weapon,...(o===p?{ammo:o.ammo,reload:!!o.reload,vy:o.vy,ack:o.ack,life:o.life}: {})}))});
+ const state=room.players.map(o=>({id:o.id,x:o.x,y:o.y,z:o.z,yaw:o.yaw,hp:Math.ceil(o.hp),kills:o.kills,weapon:o.weapon}));
+ for(const p of room.players)send(p.ws,{type:'state',players:state.map(o=>o.id===p.id?{...o,ammo:p.ammo,reload:!!p.reload,vy:p.vy,ack:p.ack,life:p.life}:o)});
  }
 },1000/30);
 server.listen(Number(process.env.PORT)||3000,'0.0.0.0',()=>console.log('BLINDSPOT listening on port '+(process.env.PORT||3000)));
