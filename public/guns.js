@@ -1,10 +1,11 @@
 import * as THREE from 'three';
+import {mergeParts} from './mesh-batch.js';
 import {WEAPONS} from './shared.js';
-export function createGun(index){
+export function createGun(index,{hands=true}={}){
  const w=WEAPONS[index],group=new THREE.Group(),pistol=w.type==='권총',shotgun=w.type==='샷건',sniper=w.type==='저격소총',smg=w.type==='기관단총';
  const metal=new THREE.MeshStandardMaterial({color:[0x283132,0x777f7c,0x384132,0x252d2e,0x293a3b,0x434d3d,0x414443,0x55625a,0x58614d,0x272c34][index],metalness:.6,roughness:.45});
  const dark=new THREE.MeshStandardMaterial({color:0x171e20,roughness:.7});const wood=new THREE.MeshStandardMaterial({color:0x805d3d});
- function part(x,y,z,a,b,c,mat=metal){const m=new THREE.Mesh(new THREE.BoxGeometry(a,b,c),mat);m.position.set(x,y,z);group.add(m);return m;}
+ function part(x,y,z,a,b,c,mat=metal){const r=Math.min(.008,a*.14,b*.14,c*.14),shape=new THREE.Shape();shape.moveTo(-a/2+r,-b/2+r);shape.lineTo(a/2-r,-b/2+r);shape.lineTo(a/2-r,b/2-r);shape.lineTo(-a/2+r,b/2-r);shape.closePath();const geometry=new THREE.ExtrudeGeometry(shape,{depth:c-2*r,bevelEnabled:true,bevelSize:r,bevelThickness:r,bevelSegments:1,steps:1,curveSegments:1});geometry.translate(0,0,-c/2+r);const m=new THREE.Mesh(geometry,mat);m.position.set(x,y,z);group.add(m);return m;}
  function tube(x,y,z,r,length,mat=dark){const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r,length,12),mat);m.rotation.x=Math.PI/2;m.position.set(x,y,z);group.add(m);return m;}
  const body=[.28,.34,.47,.43,.32,.47,.52,.40,.49,.58][index],barrel=[.17,.20,.52,.38,.22,.40,.46,.28,.58,.76][index];
  part(0,0,0,.12,pistol?.11:.14,body);
@@ -26,8 +27,21 @@ export function createGun(index){
  if(index===7)part(0,-.14,-.29,.055,.18,.065,dark);
  if(index===8){part(-.09,-.14,-.31,.025,.23,.03,dark).rotation.z=-.2;part(.09,-.14,-.31,.025,.23,.03,dark).rotation.z=.2;}
  if(index===9)part(.1,.03,.12,.10,.03,.04,dark);
+ // Receiver detail, trigger guard, rail, fasteners and a worn muzzle ring.
+ part(-.067,.025,.04,.018,.045,.10,dark);part(.067,.025,.04,.018,.045,.10,dark);
+ part(0,-.09,.015,.11,.025,.13,dark);part(0,-.12,-.04,.015,.06,.025,metal);
+ if(!pistol){for(let n=0;n<5;n++)part(0,.085,-.20+n*.045,.13,.018,.022,dark);part(.075,.025,-.08,.015,.035,.1,metal);}
+ else{for(let n=0;n<4;n++)part(.064,.055,.04+n*.027,.009,.045,.009,dark);}
+ if(smg){part(0,-.12,-.08,.13,.22,.13,metal);part(0,-.27,.05,.07,.20,.065,dark);}
+ if(hands){
+ const sleeve=new THREE.MeshLambertMaterial({color:0x596152}),glove=new THREE.MeshLambertMaterial({color:0x303938});
+ for(const [x,y,z,length]of [[.10,-.30,.28,.38],[-.13,-.22,-.08,.30]]){
+ const arm=new THREE.Mesh(new THREE.CapsuleGeometry(.055,length-.11,3,8),sleeve);arm.rotation.x=Math.PI/2-.18;arm.position.set(x,y,z);group.add(arm);
+ const hand=new THREE.Mesh(new THREE.SphereGeometry(.068,8,6),glove);hand.scale.set(1,.8,1.25);hand.position.set(x,y+.045,z-length/2);group.add(hand);
+ }
+ }
  group.name=w.name;
  const flash=new THREE.Mesh(new THREE.SphereGeometry(.065,8,6),new THREE.MeshBasicMaterial({color:0xffe3a0}));flash.scale.z=2;flash.position.set(0,.015,tip-.04);flash.visible=false;group.add(flash);
- group.userData.flash=flash;return group;
+ group.userData.flash=flash;mergeParts(group,new Set([flash]));return group;
 }
 export function disposeGroup(group){for(const texture of group.userData.textures||[])texture.dispose();group.traverse(m=>{if(m.isInstancedMesh)m.dispose();if(m.geometry)m.geometry.dispose();if(m.material){for(const material of Array.isArray(m.material)?m.material:[m.material])material.dispose();}});}

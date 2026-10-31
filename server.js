@@ -3,7 +3,7 @@ import {createServer} from 'node:http';
 import {WebSocketServer,WebSocket} from 'ws';
 import {randomBytes} from 'node:crypto';
 import * as THREE from 'three';
-import {WEAPONS,BOXES,groundHeight,mapBoxes,terrainVertices,validMap,movePlayer,damageAtDistance,shotSpread} from './public/shared.js';
+import {WEAPONS,BOXES,groundHeight,mapBoxes,terrainVertices,validMap,movePlayer,damageAtDistance,shotSpread,isGrounded,supportHeight} from './public/shared.js';
 const app=express();app.get('/health',(_req,res)=>res.json({status:'ok'}));app.use(express.static('public'));app.use('/vendor',express.static('node_modules/three/build'));
 const server=createServer(app),wss=new WebSocketServer({server}),rooms=new Map();
 const send=(ws,data)=>{if(ws.readyState===WebSocket.OPEN)ws.send(JSON.stringify(data));};
@@ -39,7 +39,7 @@ wss.on('connection',ws=>{
  player.commandMode=true;
  const now=Date.now();player.budget=Math.min(.12,(player.budget??.05)+(now-(player.budgetAt??now))/1000);player.budgetAt=now;
  if(m.seq>player.ack&&m.seq<=player.ack+180){if(player.hp>0&&player.budget>=1/60){movePlayer(player,player.input,player.yaw,1/60,room.map);player.budget-=1/60;}player.ack=m.seq;}
- }else if(i.jump&&player.y<=groundHeight(room.map,player.x,player.z)+.08&&player.hp>0)player.vy=6;
+ }else if(i.jump&&isGrounded(player,room.map)&&player.hp>0)player.vy=6;
  }
  if(m.type==='weapon'&&Number.isInteger(m.index)&&WEAPONS[m.index]&&player.weapon!==m.index){player.weapon=m.index;player.ammo=WEAPONS[m.index].mag;player.reload=Date.now()+1200;}
  if(m.type==='reload'&&player.ammo<WEAPONS[player.weapon].mag&&!player.reload)player.reload=Date.now()+1600;
@@ -53,7 +53,7 @@ function shoot(p,room){
  if(now-p.lastShot<w.interval)return;
  p.ammo--;p.lastShot=now;let hit=false,head=false;const paths=[];
  for(let n=0;n<(w.pellets||1);n++){
- const spread=shotSpread(p.weapon,p.input,p.y>groundHeight(room.map,p.x,p.z)+.12);
+ const spread=shotSpread(p.weapon,p.input,!isGrounded(p,room.map));
  const yaw=p.yaw+(Math.random()-.5)*spread,pitch=p.pitch+(Math.random()-.5)*spread;
  const origin=new THREE.Vector3(p.x,p.y+1.65,p.z),direction=new THREE.Vector3(-Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),-Math.cos(yaw)*Math.cos(pitch));
  const ray=new THREE.Ray(origin,direction);let nearest=100, victim,critical=false;
@@ -77,7 +77,7 @@ setInterval(()=>{
  if(p.reload&&now>=p.reload){p.reload=0;p.ammo=WEAPONS[p.weapon].mag;}
  if(!p.commandMode)movePlayer(p,p.input,p.yaw,dt,room.map);
  const i=p.input,moving=i.forward||i.back||i.left||i.right;
- if(i.sprint&&moving&&p.y<=groundHeight(room.map,p.x,p.z)+.08&&now-(p.step||0)>340){p.step=now;broadcast(room,{type:'sound',x:p.x,z:p.z,kind:'step',id:p.id});}
+ if(i.sprint&&moving&&isGrounded(p,room.map)&&now-(p.step||0)>340){p.step=now;broadcast(room,{type:'sound',x:p.x,z:p.z,kind:'step',id:p.id});}
  }
  const state=room.players.map(o=>({id:o.id,x:o.x,y:o.y,z:o.z,yaw:o.yaw,hp:Math.ceil(o.hp),kills:o.kills,weapon:o.weapon}));
  for(const p of room.players)send(p.ws,{type:'state',players:state.map(o=>o.id===p.id?{...o,ammo:p.ammo,reload:!!p.reload,vy:p.vy,ack:p.ack,life:p.life}:o)});

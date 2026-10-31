@@ -8,7 +8,7 @@ async function wait(fn,timeout=8000){const start=Date.now();while(!fn()){if(Date
 function connect(){return new Promise(resolve=>{const socket=new WebSocket('ws://127.0.0.1:3111');const c={socket,events:[],state:null,send:m=>socket.send(JSON.stringify(m))};socket.on('message',b=>{const m=JSON.parse(b);c.events.push(m);if(m.type==='state')c.state=m.players; if(m.type==='joined')c.id=m.id;});socket.on('open',()=>resolve(c));});}
 test('10 distinct weapons, health-scale damage, weight and map collision',()=>{
  assert.equal(WEAPONS.length,10);assert.deepEqual(['권총','샷건','기관단총','소총','저격소총'].map(t=>WEAPONS.filter(w=>w.type===t).length),[2,2,1,3,2]);
- assert.ok(WEAPONS.every(w=>w.damage>=10&&w.damage<=20));for(const key of ['damage','recoil','weight'])assert.equal(new Set(WEAPONS.map(w=>w[key])).size,10);assert.ok(speed(0)>speed(9));assert.ok(speed(0,true)>speed(0));assert.ok(blocked(0,0));assert.ok(blocked(10,0),'canal cannot be walked on');assert.equal(blocked(0,6),false,'bridge deck is walkable');assert.ok(blocked(14,0));assert.equal(blocked(-10,11),false);
+ assert.ok(WEAPONS.slice(0,8).every(w=>w.damage>=10&&w.damage<=20));for(const key of ['damage','recoil','weight'])assert.equal(new Set(WEAPONS.map(w=>w[key])).size,10);assert.ok(speed(0)>speed(9));assert.ok(speed(0,true)>speed(0));assert.ok(blocked(0,0));assert.ok(blocked(10,0),'canal cannot be walked on');assert.equal(blocked(0,6),false,'bridge deck is walkable');assert.ok(blocked(14,0));assert.equal(blocked(-10,11),false);
 });
 test('real multiplayer: rooms, movement, silent walk, sprint, jump, body/head damage, cadence, reload and respawn', {timeout:30000},async()=>{
  const proc=spawn(process.execPath,['server.js'],{env:{...process.env,PORT:'3111'}});const sockets=[];

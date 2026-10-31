@@ -2,7 +2,7 @@ import {test,expect} from '@playwright/test';
 test('WebGL lobby, two-player room and loadout selection',async({browser})=>{
  const a=await browser.newPage(),b=await browser.newPage();const errors=[];
  for(const page of [a,b])page.on('pageerror',e=>errors.push(e.message));
- await a.goto('/');await expect(a.locator('h1')).toContainText('시야 밖의 적');
+ await a.goto('/');await a.screenshot({path:'test-results/frontline-lobby.png'});await expect(a.locator('h1')).toContainText('시야 밖의 적');
  expect(await a.locator('canvas').evaluate(c=>!!c.getContext('webgl2'))).toBe(true);
  await a.locator('#create').click();await expect(a.locator('#hud')).toBeVisible();
  await a.locator('#enter').click();
@@ -40,7 +40,7 @@ test('three selectable maps, immediate stop under 100 ms latency, rifle dot and 
  await page.routeWebSocket('**/*',ws=>{const server=ws.connectToServer();server.onMessage(message=>setTimeout(()=>ws.send(message),100));});
  for(const map of ['hills','depot']){
  await page.goto('/');await expect(page.locator('#map option')).toHaveCount(3);await page.locator('#map').selectOption(map);await page.locator('#create').click();
- await expect(page.locator('#score')).toContainText(map==='hills'?'GREEN RIDGE':'DUST DEPOT');
+ await expect(page.locator('#mapname')).toContainText(map==='hills'?'GREEN RIDGE':'DUST DEPOT');
  await page.locator('#enter').click();await expect.poll(()=>page.evaluate(()=>document.pointerLockElement?.id)).toBe('game');
  const position=async()=>JSON.parse(await page.locator('canvas').getAttribute('data-position'));
  const before=await position();await page.keyboard.down('KeyD');await expect.poll(async()=>(await position())[0]).toBeGreaterThan(before[0]+.3);await page.keyboard.up('KeyD');await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));const stop=await position();await page.waitForTimeout(350);const after=await position();
@@ -74,4 +74,13 @@ test('batched rendering keeps draw calls bounded in all maps',async({page})=>{
  await expect(page.locator('#performance')).toContainText('FPS');await page.screenshot({path:'test-results/optimized-'+map+'.png'});
  }
  expect(errors).toEqual([]);
+});
+
+test('first-person building entrance and second floor remain playable',async({page})=>{
+ const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('/');await page.locator('#mapcards [data-map="depot"]').click();await expect(page.locator('#map')).toHaveValue('depot');await page.locator('#create').click();await expect(page.locator('#mapname')).toContainText('DUST DEPOT');await page.locator('#enter').click();await expect.poll(()=>page.evaluate(()=>document.pointerLockElement?.id)).toBe('game');
+ const position=async()=>JSON.parse(await page.locator('canvas').getAttribute('data-position'));
+ const walk=async(key,condition)=>{await page.keyboard.down(key);await expect.poll(async()=>condition(await position()),{timeout:12000,intervals:[16]}).toBe(true);await page.keyboard.up(key);await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));};
+ await walk('KeyD',p=>p[0]>=-8);await walk('KeyW',p=>p[2]<=3.55);await page.screenshot({path:'test-results/ground-floor.png'});
+ await walk('KeyD',p=>p[0]>=-6.4);await walk('KeyW',p=>p[2]<=-3.4);await expect.poll(async()=>(await position())[1]).toBeGreaterThan(3.15);
+ await walk('KeyA',p=>p[0]<=-8);await walk('KeyS',p=>p[2]>=1);await page.screenshot({path:'test-results/second-floor.png'});expect((await position())[1]).toBeLessThan(3.3);expect(errors).toEqual([]);
 });
