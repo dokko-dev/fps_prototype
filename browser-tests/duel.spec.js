@@ -22,9 +22,34 @@ test('WebGL lobby, two-player room and loadout selection',async({browser})=>{
  await expect(a.locator('#pause')).toBeHidden();
  await expect(a.locator('#room')).toBeVisible();
  await expect(a.locator('#ammo')).toHaveText('5 / 5');
+ await a.mouse.down({button:'right'});
+ await expect(a.locator('#scope')).toBeVisible();
+ await expect(a.locator('#scopezoom')).toHaveText('6×');
+ await expect.poll(async()=>Number(await a.locator('canvas').getAttribute('data-fov'))).toBeLessThan(16);
+ await a.screenshot({path:'test-results/sniper-scope.png'});
+ await a.mouse.up({button:'right'});await expect(a.locator('#scope')).toBeHidden();
  await a.mouse.click(640,360);
  await expect(a.locator('#ammo')).toHaveText('4 / 5');
  await a.keyboard.press('r');
  await a.screenshot({path:'test-results/lobby-duel.png'});
  expect(errors).toEqual([]);await a.close();await b.close();
+});
+
+test('three selectable maps, immediate stop under 100 ms latency, rifle dot and distinct models',async({browser})=>{
+ const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.routeWebSocket('**/*',ws=>{const server=ws.connectToServer();server.onMessage(message=>setTimeout(()=>ws.send(message),100));});
+ for(const map of ['hills','depot']){
+ await page.goto('/');await expect(page.locator('#map option')).toHaveCount(3);await page.locator('#map').selectOption(map);await page.locator('#create').click();
+ await expect(page.locator('#score')).toContainText(map==='hills'?'GREEN RIDGE':'DUST DEPOT');
+ await page.locator('#enter').click();await expect.poll(()=>page.evaluate(()=>document.pointerLockElement?.id)).toBe('game');
+ const position=async()=>JSON.parse(await page.locator('canvas').getAttribute('data-position'));
+ const before=await position();await page.keyboard.down('KeyD');await page.waitForTimeout(300);await page.keyboard.up('KeyD');await page.waitForTimeout(70);const stop=await position();await page.waitForTimeout(350);const after=await position();
+ expect(stop[0]).toBeGreaterThan(before[0]+.3);expect(Math.abs(after[0]-stop[0])).toBeLessThan(.12);
+ await page.screenshot({path:'test-results/'+map+'.png'});
+ if(map==='hills'){
+ await page.evaluate(()=>document.exitPointerLock());await page.locator('#armory').click();await page.locator('.weapon').nth(5).click();await expect(page.locator('#weaponname')).toContainText('AR4');await page.locator('#closeweapons').click();await page.locator('#enter').click();
+ await expect.poll(()=>page.evaluate(()=>document.pointerLockElement?.id)).toBe('game');await page.mouse.down({button:'right'});await expect(page.locator('#reddot')).toBeVisible();await expect(page.locator('#scope')).toBeHidden();await expect.poll(async()=>Number(await page.locator('canvas').getAttribute('data-fov'))).toBeLessThan(57);await page.screenshot({path:'test-results/rifle-dot.png'});await page.mouse.up({button:'right'});
+ }
+ }
+ expect(errors).toEqual([]);await page.close();
 });

@@ -1,2 +1,2 @@
 import {defineConfig} from '@playwright/test';
-export default defineConfig({testDir:'./browser-tests',timeout:60000,use:{baseURL:'http://127.0.0.1:3000',launchOptions:{executablePath:process.env.CHROMIUM_PATH||undefined,args:['--no-sandbox','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']}},webServer:{command:'npm start',url:'http://127.0.0.1:3000',reuseExistingServer:false}});
+export default defineConfig({testDir:'./browser-tests',workers:1,timeout:90000,use:{baseURL:'http://127.0.0.1:3000',launchOptions:{executablePath:process.env.CHROMIUM_PATH||undefined,args:['--no-sandbox','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']}},webServer:{command:'npm start',url:'http://127.0.0.1:3000',reuseExistingServer:false}});

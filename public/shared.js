@@ -22,3 +22,51 @@ export const BOXES = [
 ];
 export const speed = (weapon, sprint=false) => (4.6-WEAPONS[weapon].weight*0.28)*(sprint?1.65:1);
 export function blocked(x,z){return Math.abs(x)>13.5||Math.abs(z)>13.5||(Math.abs(z)<7.35&&Math.abs(x)>3.8)||BOXES.some(([bx,,bz,w,,d])=>Math.abs(x-bx)<w/2+0.35&&Math.abs(z-bz)<d/2+0.35);}
+
+export const MAPS = [
+ {id:'bridge',name:'BRIDGE YARD · 다리',description:'운하 위 중앙 다리와 양쪽 진영'},
+ {id:'hills',name:'GREEN RIDGE · 언덕',description:'완만한 능선과 바위 엄폐물'},
+ {id:'depot',name:'DUST DEPOT · 훈련장',description:'경사 지형과 컨테이너 교전'}
+];
+export function validMap(id){return MAPS.some(m=>m.id===id)?id:'bridge';}
+function rawHeight(id,x,z){
+ if(id==='hills')return 2.6*Math.exp(-((x+2)**2+(z-1)**2)/65)+1.3*Math.exp(-((x-9)**2+(z+7)**2)/28);
+ if(id==='depot')return Math.max(0,Math.min(2.5,(x+4)*.22));
+ return 0;
+}
+// Use the same triangulated one-metre surface for physics, rendering and hits.
+export function groundHeight(id,x,z){
+ const ix=Math.max(-14,Math.min(13,Math.floor(x))),iz=Math.max(-14,Math.min(13,Math.floor(z)));
+ const u=Math.max(0,Math.min(1,x-ix)),v=Math.max(0,Math.min(1,z-iz));
+ const a=rawHeight(id,ix,iz),b=rawHeight(id,ix+1,iz),c=rawHeight(id,ix,iz+1),d=rawHeight(id,ix+1,iz+1);
+ return u+v<=1?a+(b-a)*u+(c-a)*v:d+(c-d)*(1-u)+(b-d)*(1-v);
+}
+export function terrainVertices(id){const result=[];for(let x=-14;x<14;x++)for(let z=-14;z<14;z++)for(const [a,b]of [[x,z],[x,z+1],[x+1,z],[x+1,z],[x,z+1],[x+1,z+1]])result.push(a,rawHeight(id,a,b),b);return result;}
+const boxCache=new Map();
+export function mapBoxes(id){
+ if(boxCache.has(id))return boxCache.get(id);
+ if(id==='bridge')return BOXES;
+ const cover=id==='hills'?[[0,1,0,2,2,2],[-6,1.2,4,3,2.4,2],[5,1.2,-3,2,2.4,3],[-5,1,-7,3,2,2],[7,1,7,3,2,2]]:
+ [[0,1.5,0,3,3,3],[-6,1.5,4,3,3,5],[6,1.5,-4,3,3,5],[-5,1,-8,3,2,2],[5,1,8,3,2,2]];
+ const result=[...cover,...BOXES.slice(-4)].map(([x,y,z,w,h,d])=>[x,y+groundHeight(id,x,z),z,w,h,d]);boxCache.set(id,result);return result;
+}
+export function mapBlocked(id,x,z){return Math.abs(x)>13.5||Math.abs(z)>13.5||(id==='bridge'&&Math.abs(z)<7.35&&Math.abs(x)>3.8)||mapBoxes(id).some(([bx,,bz,w,,d])=>Math.abs(x-bx)<w/2+.35&&Math.abs(z-bz)<d/2+.35);}
+export function movePlayer(p,input,yaw,dt,map='bridge'){
+ let f=Number(!!input.forward)-Number(!!input.back),r=Number(!!input.right)-Number(!!input.left);const length=Math.hypot(f,r)||1;f/=length;r/=length;
+ const v=speed(p.weapon,input.sprint)*(input.ads?.72:1)*dt;
+ const dx=(-Math.sin(yaw)*f+Math.cos(yaw)*r)*v,dz=(-Math.cos(yaw)*f-Math.sin(yaw)*r)*v;
+ if(!mapBlocked(map,p.x+dx,p.z))p.x+=dx;if(!mapBlocked(map,p.x,p.z+dz))p.z+=dz;
+ const floor=groundHeight(map,p.x,p.z),grounded=p.y<=floor+.08&&p.vy<=0;
+ if(input.jump&&grounded)p.vy=6;
+ p.vy-=16*dt;p.y=Math.max(floor,p.y+p.vy*dt);if(p.y<=floor)p.vy=0;
+}
+export function damageAtDistance(index,distance){
+ const w=WEAPONS[index];if(w.type==='저격소총')return w.damage;const profile=w.type==='권총'?[8,28,.35]:w.type==='샷건'?[7,23,.25]:w.type==='기관단총'?[10,32,.45]:[16,55,.65];
+ const [start,end,min]=profile,t=Math.max(0,Math.min(1,(distance-start)/(end-start)));
+ return w.damage*(1-t*(1-min));
+}
+export function shotSpread(index,input,airborne=false){
+ const w=WEAPONS[index],moving=input.forward||input.back||input.left||input.right;
+ // Full cone width in radians. ADS never removes movement or jump penalties.
+ return (w.spread||0)*(input.ads?.7:1)+(moving?(input.sprint?.10:.055):0)+(airborne?.12:0);
+}
