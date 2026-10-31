@@ -1,0 +1,20 @@
+{
+  "name": "blindspot-duel",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js",
+    "test": "node --test test/*.test.js",
+    "test:browser": "playwright test"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "three": "^0.180.0",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.0"
+  }
+}

@@ -1,0 +1,21 @@
+import {test,expect} from '@playwright/test';
+test('WebGL lobby, two-player room and loadout selection',async({browser})=>{
+ const a=await browser.newPage(),b=await browser.newPage();const errors=[];
+ for(const page of [a,b])page.on('pageerror',e=>errors.push(e.message));
+ await a.goto('/');await expect(a.locator('h1')).toContainText('시야 밖의 적');
+ expect(await a.locator('canvas').evaluate(c=>!!c.getContext('webgl2'))).toBe(true);
+ await a.locator('#create').click();await expect(a.locator('#hud')).toBeVisible();
+ const code=(await a.locator('#room').textContent()).match(/[A-F0-9]{6}/)[0];
+ await b.goto('/');await b.locator('#code').fill(code);await b.locator('#join').click();
+ await expect(a.locator('#score')).toHaveText('0  :  0');await expect(b.locator('#hp')).toHaveText('100');
+ await a.locator('#armory').click();await expect(a.locator('.weapon')).toHaveCount(10);
+ await a.locator('.weapon').nth(9).click();await expect(a.locator('#weaponname')).toContainText('SR8');
+ await a.locator('#closeweapons').click();await expect(a.locator('#weapons')).toBeHidden();
+ await a.locator('#enter').click();
+ await expect.poll(()=>a.evaluate(()=>document.pointerLockElement?.id)).toBe('game');
+ await expect(a.locator('#pause')).toBeHidden();
+ await expect(a.locator('#room')).toBeVisible();
+ await a.keyboard.press('r');
+ await a.screenshot({path:'test-results/lobby-duel.png'});
+ expect(errors).toEqual([]);await a.close();await b.close();
+});
