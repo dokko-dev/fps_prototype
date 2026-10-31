@@ -27,7 +27,7 @@ export function buildArena(id){
  for(const [x,y,z,w,h,d,kind]of mapBoxes(id)){
  const wall=w>=28||d>=28,container=id==='depot'&&!wall&&!kind;
  const color=kind?(kind==='stair'?'#8f9189':kind==='floor'?'#797d76':kind==='roof'?'#626e70':y<3?'#aaa591':'#b4b0a0'):wall?(id==='hills'?'#939b8c':id==='depot'?'#b1a38d':'#809197'):container?['#b56d44','#4e7b92','#81906a','#bd9146','#8b6470'][index%5]:h<1.5?'#9ca9ad':id==='hills'?'#8c9380':['#a2a79e','#818d97','#b39c79'][index%3];
- const m=box(x,y,z,w,h,d,color);
+ const m=box(x,y,z,w,h,d,color);if(kind==='floor'&&h===.2)m.position.y+=.012;
  if(container){m.material.map=textures.metal;m.material.metalness=.3;
  for(let a=-w/2+.18;a<w/2;a+=.42)box(x+a,y,z+d/2+.015,.045,h-.1,.035,color);
  for(const side of [-1,1])box(x,y+side*(h/2-.08),z,w+.05,.10,d+.05,'#4b5358');

@@ -12,7 +12,7 @@ const camera=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,.05,100);came
 scene.add(new THREE.HemisphereLight(0xddeaff,0x555044,1.5));const sun=new THREE.DirectionalLight(0xffe8c2,3.2);sun.position.set(-8,20,6);sun.castShadow=true;sun.shadow.bias=-.00025;sun.shadow.normalBias=.035;sun.shadow.radius=2;sun.shadow.mapSize.set(1024,1024);sun.shadow.camera.left=-20;sun.shadow.camera.right=20;sun.shadow.camera.top=20;sun.shadow.camera.bottom=-20;scene.add(sun);
 let mapId='bridge',world=buildArena(mapId);scene.add(world);renderer.shadowMap.needsUpdate=true;
 function selectWorld(id){const sky={bridge:'#b4cdd8',hills:'#b6cee0',depot:'#d6c8b1'}[id];scene.background.set(sky);scene.fog.color.set(sky);if(id===mapId)return;scene.remove(world);disposeGroup(world);mapId=id;world=buildArena(id);scene.add(world);renderer.shadowMap.needsUpdate=true;applyMaterialQuality();}
-let gun=createGun(0),flash=gun.userData.flash,gunIndex=0;camera.add(gun);scene.add(camera);
+let gun=createGun(0),flash=gun.userData.flash,gunIndex=0;gun.visible=false;camera.add(gun);scene.add(camera);
 const gunMat=new THREE.MeshStandardMaterial({color:0x222b26,roughness:.6});
 function changeGun(index){if(index===gunIndex)return;ads=false;camera.remove(gun);disposeGroup(gun);gun=createGun(index);gunIndex=index;flash=gun.userData.flash;camera.add(gun);canvas.dataset.weapon=String(index);}
 let flashUntil=0;const tracers=[];
